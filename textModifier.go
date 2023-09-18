@@ -12,7 +12,7 @@ import (
 func correctModification(modified []string, wordChecked string, puncts string) []string {
 	parenthesis, _ := regexp.Compile(`\w+\)$`)
 	if parenthesis.MatchString(wordChecked) {
-		modified = append(modified[:len(modified)-2], modified[len(modified)-1]+puncts)
+		modified = append(modified[:len(modified)-1], modified[len(modified)-1]+puncts)
 	} else {
 		modified = append(modified, wordChecked+puncts)
 	}
@@ -64,36 +64,31 @@ func main() {
 		// check each words[i+1] and treat words[i]
 		words := strings.Split(string(bytes), " ")
 		i := 0
-		shouldSkip := 0 // count the words should not be recoreded (e.g: (hex), (low, 2))
+		shouldSkip := 0     // count the words should not be recoreded (e.g: (hex), (low, 2))
+		shortendLength := 0 // count the jointed words
+		count := 0
 
 		// to check the key letters in the loop
 		puncts, _ := regexp.Compile(`^[.,!?;:]`)
-		marks, _ := regexp.Compile(`^[']$`)
+		marks, _ := regexp.Compile(`^'`)
 		vowels, _ := regexp.Compile(`(?i)\b[aeiou]\w*\b`)
-
-		// record ' start and end
-		openMark := false
+		startWithPuncts, _ := regexp.Compile(`[.,!?;:]\S*`)
+		isPunct := puncts.MatchString(words[i+1])
 
 		for i < len(words) {
+			fmt.Println(strings.Join(modified, " "))
 			// add last words
 			if i == len(words)-1 {
 				punctsEx, _ := regexp.Compile(`^('|(?:\.{3}|[\?!]{2}))`)
-				ap, _ := regexp.Compile(`^(')`)
-				if !punctsEx.MatchString(words[i]) {
+				if !punctsEx.MatchString(words[i]) && !puncts.MatchString(words[i]) {
 					fmt.Printf("last word added: %v\n", words[i])
 					modified = append(modified, words[i])
-				} else if ap.MatchString(words[i]) {
-					modified = append(modified, words[i-1]+"'")
 				}
 				i++
 
 			} else {
 
-				fmt.Printf("check: %v, skipcount: %v\n", words[i+1], shouldSkip)
-
-				// for the case to check punctuations (case isPunct)
-				isPunct := puncts.MatchString(words[i+1])
-				isMark := marks.MatchString(words[i+1])
+				fmt.Printf("loop num: %v, check: %v, skipcount: %v, count %v\n", i, words[i+1], shouldSkip, count)
 
 				switch true {
 
@@ -112,7 +107,7 @@ func main() {
 					}
 
 				case strings.Contains(words[i+1], "(low") || strings.Contains(words[i+1], "(up") || strings.Contains(words[i+1], "(cap"):
-					count := 1 // how many words to modify
+					count = 1 // how many words to modify
 					shouldSkip = 1
 
 					// check if there's number after the sign
@@ -129,6 +124,8 @@ func main() {
 
 							// remove the element to be modified
 							modified = modified[:len(modified)-count+1]
+							fmt.Println("modified removed")
+							fmt.Println(strings.Join(modified, " "))
 						}
 					}
 
@@ -146,36 +143,24 @@ func main() {
 					i++
 
 				case isPunct:
+
 					// deal with ... or ?! differently
 					punctsEx, _ := regexp.Compile(`^(?:\.{3}|[\?!]{2})`)
 					punctsExFound := punctsEx.FindString(words[i+1])
 					if punctsExFound != "" {
 						modified = correctModification(modified, words[i], punctsExFound)
 						shouldSkip = 1
+
 					} else { // deal with other punctuations
+
 						punctsFound := puncts.FindString(words[i+1])
 						modified = correctModification(modified, words[i], punctsFound)
-						shouldSkip = 1
-					}
-					i++
-
-				case isMark:
-					if openMark {
-						modified = correctModification(modified, words[i], "'")
-						shouldSkip = 1
-						openMark = false
-						fmt.Println("mark closed")
-					} else {
-						for j := 0; j < len(words)-1; j++ {
+						tmp := startWithPuncts.FindString(words[i+1])
+						if len(tmp) > 1 {
+							modified = append(modified, tmp[1:])
 
 						}
-						if i+1 != len(words)-1 {
-							modified = append(modified, words[i])
-							modified = append(modified, "'"+words[i+2])
-							shouldSkip = 2
-							openMark = true
-							fmt.Println("mark started")
-						}
+						shouldSkip = 1
 					}
 					i++
 
@@ -184,16 +169,91 @@ func main() {
 						// deal with "a"
 						if strings.Compare(words[i], "a") == 0 && vowels.MatchString(words[i+1]) {
 							modified = append(modified, "an")
-							fmt.Printf("word added: %v\n", "an")
-						} else {
-							modified = append(modified, words[i])
-							fmt.Printf("word added: %v\n", words[i])
+							fmt.Println("a found")
+						} else if marks.MatchString(words[i]) { // deal with punctuation marks
+							fmt.Println("mark found")
+							modified = append(modified, "'"+words[i+1])
+							for j := i + 2 - shortendLength; j < len(words); j++ {
+								fmt.Printf("Mark loop: %v, check %v\n", j, words[j])
+								fmt.Println(strings.Join(modified, " "))
+
+								if puncts.MatchString(words[j]) {
+									fmt.Println("BUG?")
+
+									punctsEx, _ := regexp.Compile(`^(?:\.{3}|[\?!]{2})`)
+									punctsExFound := punctsEx.FindString(words[j+1])
+									if punctsExFound != "" {
+
+										modified = correctModification(modified, words[j], punctsExFound)
+										shouldSkip = 1
+
+									} else { // deal with other punctuations
+										fmt.Println("BUG?")
+
+										punctsFound := puncts.FindString(words[j+1])
+										modified = correctModification(modified, words[j], punctsFound)
+										tmp := startWithPuncts.FindString(words[j+1])
+										if len(tmp) > 1 {
+											modified = append(modified, tmp[1:])
+
+										}
+										shouldSkip = 1
+									}
+								}
+
+								if marks.MatchString(words[j]) {
+									fmt.Printf("check last word %v start with ' \n", modified[j-2])
+									if marks.MatchString(modified[j-2]) {
+										modified = append(modified[:j-2], modified[j-2]+"'")
+										fmt.Printf("front mark found in the last word: %v\n", modified[j-2])
+										shouldSkip += 2
+										shortendLength += 2
+
+										break
+
+									} else {
+
+										modified = append(modified[:len(modified)-2], words[j-1]+"'")
+										fmt.Printf("word added in mark: %v\n", words[j-1])
+										shouldSkip++
+
+										break
+									}
+								} else {
+									modified = append(modified, words[j])
+									shouldSkip++
+								}
+							}
+						} else { // when no special cases found
+
+							if puncts.MatchString(words[i]) {
+								fmt.Println("bug?")
+
+								// deal with ... or ?! differently
+								punctsEx, _ := regexp.Compile(`^(?:\.{3}|[\?!]{2})`)
+								punctsExFound := punctsEx.FindString(words[i])
+								if punctsExFound != "" {
+									modified = correctModification(modified, words[i], punctsExFound)
+									shouldSkip = 1
+
+								} else { // deal with other punctuations
+
+									punctsFound := puncts.FindString(words[i])
+									modified = append(modified[:i-1], words[i]+punctsFound)
+									tmp := startWithPuncts.FindString(words[i])
+									if len(tmp) > 1 {
+										modified = append(modified, tmp[1:])
+
+									}
+									shouldSkip = 1
+								}
+							} else {
+								modified = append(modified, words[i])
+								fmt.Printf("word added: %v\n", words[i])
+							}
 						}
-
-						// deal with punctuation marks
-
-					}
-					if shouldSkip > 0 {
+					} else if shouldSkip > 0 {
+						fmt.Println("word not added")
 						shouldSkip--
 					}
 					i++
@@ -202,7 +262,7 @@ func main() {
 			}
 		}
 
-		fmt.Println(strings.Join(modified, " "))
+		fmt.Println("end of loop: ", strings.Join(modified, " "))
 
 		// write the result to the file
 		err = os.WriteFile(os.Args[2], []byte(strings.Join(modified, " ")), 0666)
