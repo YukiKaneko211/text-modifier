@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -39,75 +40,80 @@ func main() {
 	args := os.Args
 	argsLength := len(args)
 
+	// if having correct arguments (number of files)
 	if argsLength == 3 {
 		// check files exist
 		for i := 1; i < argsLength; i++ {
 			_, err := os.Open(os.Args[i])
+
+			// if file does not exist
 			if err != nil {
 				fmt.Printf("%v\n", err.Error())
 				os.Exit(1)
 			}
 		}
 
-		// if files exist
 		original := os.Args[1]
 		bytes, err := os.ReadFile(original)
+		// in case unable to read the content
 		if err != nil {
 			fmt.Printf("%v\n", err.Error())
 			os.Exit(1)
 		}
 
-		words := strings.Split(string(bytes), " ")
-
-		// making new string to write in the result
+		// making new []string to write in the result
 		modified := []string{}
-		i := 0
-		for i < len(words) {
-			fmt.Println(i)
 
-			// avoid the error ( i+1 == len(words) )
+		// check each words[i+1] and treat words[i]
+		words := strings.Split(string(bytes), " ")
+		i := 0
+		shouldSkip := 0 // count the words should not be recoreded (e.g: (hex), (low, 2))
+		for i < len(words) {
+			// add last words anyway
 			if i == len(words)-1 {
+				fmt.Printf("last word added: %v\n", words[i])
 				modified = append(modified, words[i])
 				i++
 
 			} else {
 
-				nextFirstLetter, nextRestLetter := getFirstLetter(words[i+1])
-				fmt.Printf("check %v\n", words[i+1])
+				fmt.Printf("check: %v, skipcount: %v\n", words[i+1], shouldSkip)
+
+				// for the case to check punctuation (case found:)
+				puncts, _ := regexp.Compile(`^[.,!?;:]`)
+				found := puncts.MatchString(words[i+1])
 
 				switch true {
 
-				case nextFirstLetter == '.' || nextFirstLetter == ',' || nextFirstLetter == '!' || nextFirstLetter == '?' || nextFirstLetter == ':' || nextFirstLetter == ';':
-					fmt.Printf("First %v, rest %v\n", nextFirstLetter, nextRestLetter)
-					modified = append(modified, words[i]+string(nextFirstLetter))
-					modified = append(modified, nextRestLetter)
-					i += 2
-
-				// if "(hex)" found
 				case strings.Contains(words[i+1], "(hex)"):
 					if dec, err := strconv.ParseInt(words[i], 16, 64); err == nil {
 						modified = append(modified, strconv.Itoa(int(dec)))
+						shouldSkip = 1
 						i += 1
 					}
 
-				// if "(bin)" found
 				case strings.Contains(words[i+1], "(bin)"):
-					if dec, err := strconv.ParseInt(words[i], 10, 64); err == nil {
+					if dec, err := strconv.ParseInt(words[i], 2, 64); err == nil {
 						modified = append(modified, strconv.Itoa(int(dec)))
+						shouldSkip = 1
 						i += 1
 					}
 
 				case strings.Contains(words[i+1], "(low") || strings.Contains(words[i+1], "(up") || strings.Contains(words[i+1], "(cap"):
-					count := 1
-					extraSkip := 0 // use it to skip the number element to record
+					count := 1 // how many words to modify
+					shouldSkip = 1
 
 					// check if there's number after the sign
 					if i+1 != len(words)-1 { // avoid access to out of range
-						fmt.Printf("not a last word %v\n", words[i+1])
-						if words[i+2][0] >= '1' && words[i+2][0] <= '9' {
-							fmt.Printf("count found %v\n", words[i+2][0:len(words[i+2])-1])
-							count, _ = strconv.Atoi(words[i+2][0 : len(words[i+2])-1])
-							extraSkip = 1
+						word := regexp.MustCompile(`\d+(\.\d+)?`)
+						numberFound := word.FindAllString(words[i+2], -1)
+						if numberFound != nil {
+							stringNumbers := ""
+							for _, stringNumber := range numberFound {
+								stringNumbers += stringNumber
+							}
+							count, _ = strconv.Atoi(stringNumbers)
+							shouldSkip = 2
 
 							// remove the element to be modified
 							modified = modified[:len(modified)-count+1]
@@ -121,14 +127,38 @@ func main() {
 						case strings.Contains(words[i+1], "(up"):
 							modified = append(modified, strings.ToUpper(words[i-count+1]))
 						case strings.Contains(words[i+1], "(cap"):
-							modified = append(modified, toTitle(words[i-count+1]))
+							modified = append(modified, toTitle(words[i-count+1])) // they say strings.Title is obsolete function :(
 						}
 						count--
 					}
-					i = i + 1 + extraSkip
+					i++
+					break
+
+				// check puctuations
+				case found:
+					// deal with ... or ?! differently
+					punctsEx, _ := regexp.Compile(`^(\.{3}|\?!)`)
+					punctsExFound := punctsEx.FindString(words[i+1])
+					if punctsExFound != "" {
+						modified = append(modified, words[i]+punctsExFound)
+						fmt.Printf("word added: %v\n", words[i])
+						shouldSkip = 1
+					} else {
+						punctsFound := puncts.FindString(words[i+1])
+						modified = append(modified, words[i]+punctsFound)
+						fmt.Printf("word added: %v\n", words[i])
+						shouldSkip = 1
+					}
+					i++
 
 				default:
-					modified = append(modified, words[i])
+					if shouldSkip == 0 {
+						modified = append(modified, words[i])
+						fmt.Printf("word added: %v\n", words[i])
+					}
+					if shouldSkip > 0 {
+						shouldSkip--
+					}
 					i++
 				}
 
@@ -143,6 +173,7 @@ func main() {
 			fmt.Printf("%v\n", err.Error())
 			os.Exit(1)
 		}
+		fmt.Println("The result is successfully written in the file.")
 
 	} else { // not enough or too many arguments
 		fmt.Println("Please specify files to read and write.")
