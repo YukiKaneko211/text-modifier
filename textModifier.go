@@ -50,13 +50,13 @@ func main() {
 		// making new []string to write in the result
 		modified := []string{}
 		modifiedLength := 0
-
 		words := strings.Split(string(bytes), " ")
-		i := 0
-		count := 0
-		openMark := false
 
-		// to check the key letters in the loop
+		// numbers to manage conditions in the loop
+		i := 0
+		openMark := false // in the open ' mark?
+
+		// regep to check the key letters in the loop
 		punctsOnly, _ := regexp.Compile(`^[\W]$|^((?:\.{3}|[\?!]{2}))$`)
 		endWithPuncts, _ := regexp.Compile(`[\W]$|((?:\.{3}|[\?!]{2}))$`)
 		startWithPuncts, _ := regexp.Compile(`^\W+([\S]+)`)
@@ -64,11 +64,6 @@ func main() {
 		vowels, _ := regexp.Compile(`(?i)\b[aeiou]\w*\b`)
 
 		for i < len(words) {
-			fmt.Printf("loop num: %v, check: %v, len(words): %v, count %v\n", i, words[i], len(words), count)
-			fmt.Println(strings.Join(modified, " "), " ,modifiedLength:", modifiedLength)
-
-			// add last words
-
 			switch true {
 
 			case strings.Contains(words[i], "(hex)"):
@@ -94,14 +89,10 @@ func main() {
 					} else {
 						count, _ = strconv.Atoi(numberFound)
 					}
-					fmt.Printf("count: %v\n", count)
+					// remove already added words from modified to add converted ones instead
 					modifiedLength -= count
 					modified = modified[:modifiedLength]
 					for j := count; j > 0; j-- {
-						fmt.Printf("capitalized word %v\n", words[i-j])
-						fmt.Println(strings.Join(modified, " "), modifiedLength)
-
-						fmt.Println("removed modified:", strings.Join(modified, " "))
 						switch true {
 						case strings.Contains(words[i], "(low"):
 							modified = append(modified, strings.ToLower(words[i-j]))
@@ -112,7 +103,7 @@ func main() {
 						}
 						modifiedLength++
 					}
-					// skip if there was number
+					// skip ~) part if there was number
 					if numberFound != "" {
 						i++
 					}
@@ -121,17 +112,14 @@ func main() {
 
 			// ... & !?s and single punctuations
 			case punctsOnly.MatchString(words[i]):
-				fmt.Printf("Singlepunct Found: check %v\n", modified[modifiedLength-1])
 				punctsOnlyFound := punctsOnly.FindString(words[i])
-				if punctsOnlyFound == "'" && !openMark { // only ' stick to the right letter
-					fmt.Printf("StartMark Found")
+				if punctsOnlyFound == "'" && !openMark { // only start ' stick to the right letter
 					modified = append(modified, punctsOnlyFound+words[i+1])
 					modifiedLength++
 					openMark = true
 					i++
 				} else { // stick to the left letter
 					if punctsOnlyFound != string(modified[modifiedLength-1][len(modified[modifiedLength-1])-1]) {
-						fmt.Printf("Testing: add %v\n", modified[modifiedLength-1]+punctsOnlyFound)
 						modified = append(modified[:modifiedLength-1], modified[modifiedLength-1]+punctsOnlyFound)
 						if punctsOnlyFound == "'" && openMark {
 							openMark = false
@@ -140,10 +128,10 @@ func main() {
 				}
 				i++
 
+			// deal with the words start with punctuations
 			case startWithPuncts.MatchString(words[i]):
 				startWithPunctsFound := startWithPuncts.FindString(words[i])
 				if !endWithPuncts.MatchString(modified[modifiedLength-1]) {
-					fmt.Printf("Testing: add %v\n", modified[modifiedLength-1]+string(startWithPunctsFound[0]))
 					modified = append(modified[:modifiedLength-1], modified[modifiedLength-1]+string(startWithPunctsFound[0]))
 				}
 				modified = append(modified, string(startWithPunctsFound[1:]))
@@ -153,21 +141,14 @@ func main() {
 			case strings.Compare(words[i], "a") == 0 && vowels.MatchString(words[i+1]):
 				modified = append(modified, "an")
 				modifiedLength++
-				fmt.Printf("word added: %v\n", "an")
 				i++
 
 			default:
-				fmt.Println("Default")
 				modified = append(modified, words[i])
 				modifiedLength++
 				i++
 			}
-			fmt.Println("Words checked: ", strings.Join(words[:i], " "))
-			fmt.Println("Modified RN: ", strings.Join(modified, " "))
 		}
-
-		fmt.Println("End of loop: ", strings.Join(modified, " "))
-
 		// write the result to the file
 		err = os.WriteFile(os.Args[2], []byte(strings.Join(modified, " ")), 0666)
 		if err != nil {
