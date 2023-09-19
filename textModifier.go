@@ -19,9 +19,11 @@ func toTitle(s string) string {
 	}
 	return result
 }
+
 func main() {
 	args := os.Args
 	argsLength := len(args)
+
 	// if having correct arguments (number of files)
 	if argsLength == 3 {
 		// check files exist
@@ -40,18 +42,18 @@ func main() {
 			fmt.Printf("%v\n", err.Error())
 			os.Exit(1)
 		}
+
 		// making new []string to write in the result
 		modified := []string{}
 		modifiedLength := 0
 		words := strings.Split(string(bytes), " ")
 		i := 0
-		count := 0
 		openMark := false
+
 		// to check the key letters in the loop
 		punctsOnly, _ := regexp.Compile(`^[.,!?:;']$|^((?:\.{3}|[\?!]{2}))$`)
 		endWithPuncts, _ := regexp.Compile(`[\W]$|((?:\.{3}|[\?!]{2}))$`)
 		startWithPuncts, _ := regexp.Compile(`^[.,!?:;]([\S]+)`)
-		// validNum, _ := regexp.Compile(`^[\d]+[)]$`)
 		anyNumber, _ := regexp.Compile(`\d+(\.\d+)?`)
 		vowels, _ := regexp.Compile(`(?i)\b[aeiouh]\w*\b`)
 		startWithMark, _ := regexp.Compile(`^[\']([\S]+)`)
@@ -69,11 +71,7 @@ func main() {
 		}
 		aChecked = append(aChecked, words[len(words)-1])
 
-		fmt.Println("A checked: ", strings.Join(aChecked, " "))
-
 		for i < len(aChecked) {
-			fmt.Printf("loop num: %v, check: %v, len(aChecked): %v, count %v\n", i, aChecked[i], len(aChecked), count)
-			fmt.Println(strings.Join(modified, " "), " ,modifiedLength:", modifiedLength)
 			switch true {
 			case strings.Contains(aChecked[i], "(hex)"):
 				if dec, err := strconv.ParseInt(aChecked[i-1], 16, 64); err == nil {
@@ -118,7 +116,6 @@ func main() {
 
 				// gives an error if there is invalid words to converted for given number
 				for j := i - count; j < i; j++ {
-					fmt.Println("BUG ", j, i, count, aChecked[j])
 					isInvalid := nonWords.MatchString(aChecked[j])
 					if isInvalid {
 						fmt.Println("Error: invalid words to convert cases in the sample text.")
@@ -129,9 +126,6 @@ func main() {
 				modifiedLength -= count
 				modified = modified[:modifiedLength]
 				for j := count; j > 0; j-- {
-					fmt.Printf("capitalized word %v\n", aChecked[i-j])
-					fmt.Println(strings.Join(modified, " "), modifiedLength)
-					fmt.Println("removed modified:", strings.Join(modified, " "))
 					switch true {
 					case strings.Contains(aChecked[i], "(low"):
 						modified = append(modified, strings.ToLower(aChecked[i-j]))
@@ -158,14 +152,12 @@ func main() {
 			case punctsOnly.MatchString(aChecked[i]):
 				punctsOnlyFound := punctsOnly.FindString(aChecked[i])
 				if punctsOnlyFound == "'" && !openMark { // only ' stick to the right letter
-					fmt.Printf("StartMark Found")
 					modified = append(modified, punctsOnlyFound+aChecked[i+1])
 					modifiedLength++
 					openMark = true
 					i++
 				} else { // stick to the left letter
 					if punctsOnlyFound != string(modified[modifiedLength-1][len(modified[modifiedLength-1])-1]) {
-						fmt.Printf("Testing: add %v\n", modified[modifiedLength-1]+punctsOnlyFound)
 						modified = append(modified[:modifiedLength-1], modified[modifiedLength-1]+punctsOnlyFound)
 						if punctsOnlyFound == "'" && openMark {
 							openMark = false
@@ -173,26 +165,23 @@ func main() {
 					}
 				}
 				i++
+
 			case startWithPuncts.MatchString(aChecked[i]):
 				startWithPunctsFound := startWithPuncts.FindString(aChecked[i])
 				if !endWithPuncts.MatchString(modified[modifiedLength-1]) {
-					fmt.Printf("Testing: add %v\n", modified[modifiedLength-1]+string(startWithPunctsFound[0]))
 					modified = append(modified[:modifiedLength-1], modified[modifiedLength-1]+string(startWithPunctsFound[0]))
 				}
 				modified = append(modified, string(startWithPunctsFound[1:]))
 				modifiedLength++
 				i++
+
 			default:
-				fmt.Println("Default")
 				modified = append(modified, aChecked[i])
 				modifiedLength++
 				i++
 			}
-			fmt.Println("aChecked checked: ", strings.Join(aChecked[:i], " "))
-			fmt.Println("Modified RN: ", strings.Join(modified, " "))
 		}
 
-		fmt.Println("End of loop: ", strings.Join(modified, " "))
 		// write the result to the file
 		err = os.WriteFile(os.Args[2], []byte(strings.Join(modified, " ")), 0666)
 		if err != nil {
