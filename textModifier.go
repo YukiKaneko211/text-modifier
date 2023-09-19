@@ -74,7 +74,6 @@ func main() {
 		for i < len(aChecked) {
 			fmt.Printf("loop num: %v, check: %v, len(aChecked): %v, count %v\n", i, aChecked[i], len(aChecked), count)
 			fmt.Println(strings.Join(modified, " "), " ,modifiedLength:", modifiedLength)
-			// add last aChecked
 			switch true {
 			case strings.Contains(aChecked[i], "(hex)"):
 				if dec, err := strconv.ParseInt(aChecked[i-1], 16, 64); err == nil {
