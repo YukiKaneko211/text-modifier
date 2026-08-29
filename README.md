@@ -2,6 +2,8 @@
 
 Simple Go program to complete/edit/auto-correct text.
 
+This app was created according to the requirements of kood/Jõhvi: https://github.com/01-edu/public/tree/master/subjects/go-reloaded
+
 ## Used Technologies
 
 - Go (libraries below):
